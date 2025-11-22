@@ -104,7 +104,8 @@ export class ServiceRepository {
 
 	async getServicesWithProvider(): Promise<ServiceWithProvider[]> {
 		return runAsync(() => {
-			const query = `
+			// OPTIMIZED: Fetch all services with providers in one query
+			const servicesQuery = `
                 SELECT s.id as service_id, s.provider_id, s.service_name, s.service_ip,
                        s.service_status, s.service_type, s.created_at as service_created_at,
                        s.container_details,
@@ -116,8 +117,46 @@ export class ServiceRepository {
                 ORDER BY s.created_at DESC
             `;
 
-			const rows: ServiceRowWithProviderRow[] = this.db.prepare(query).all() as ServiceRowWithProviderRow[];
+			const rows: ServiceRowWithProviderRow[] = this.db.prepare(servicesQuery).all() as ServiceRowWithProviderRow[];
 
+			// OPTIMIZED: Fetch all tags for all services in a single query (eliminates N+1)
+			const serviceIds = rows.map((row) => row.service_id);
+			let tagsMap: Map<number, Tag[]> = new Map();
+
+			if (serviceIds.length > 0) {
+				// Create placeholders for IN clause
+				const placeholders = serviceIds.map(() => '?').join(',');
+				const tagsQuery = `
+                    SELECT st.service_id, t.id, t.name, t.color, t.created_at as createdAt
+                    FROM tags t
+                    JOIN service_tags st ON t.id = st.tag_id
+                    WHERE st.service_id IN (${placeholders})
+                    ORDER BY st.service_id, t.name
+                `;
+				const tagRows = this.db.prepare(tagsQuery).all(...serviceIds) as Array<{
+					service_id: number;
+					id: number;
+					name: string;
+					color: string;
+					createdAt: string;
+				}>;
+
+				// Group tags by service_id
+				for (const tagRow of tagRows) {
+					const tag: Tag = {
+						id: tagRow.id,
+						name: tagRow.name,
+						color: tagRow.color,
+						createdAt: tagRow.createdAt,
+					};
+					if (!tagsMap.has(tagRow.service_id)) {
+						tagsMap.set(tagRow.service_id, []);
+					}
+					tagsMap.get(tagRow.service_id)!.push(tag);
+				}
+			}
+
+			// Map services with their tags
 			return rows.map((row: ServiceRowWithProviderRow): ServiceWithProvider => {
 				let containerDetails: ContainerDetails | undefined;
 				if (row.container_details) {
@@ -128,15 +167,6 @@ export class ServiceRepository {
 					}
 				}
 
-				const query = `
-                    SELECT t.id as id, t.name as name, t.color as color, t.created_at as createdAt
-                    FROM tags t
-                             JOIN service_tags st ON t.id = st.tag_id
-                    WHERE st.service_id = ?
-                    ORDER BY t.name
-                `;
-				const tags = this.db.prepare(query).all(row.service_id) as Tag[];
-
 				return {
 					id: row.service_id,
 					providerId: row.provider_id,
@@ -146,7 +176,7 @@ export class ServiceRepository {
 					serviceType: row.service_type as ServiceType,
 					createdAt: row.service_created_at,
 					containerDetails,
-					tags: tags,
+					tags: tagsMap.get(row.service_id) || [],
 					provider: {
 						id: row.provider_id,
 						name: row.provider_name,
