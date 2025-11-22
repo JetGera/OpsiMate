@@ -1,18 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
-import {
-  loadConfig,
-  getServerConfig,
-  getDatabaseConfig,
-  getMailerConfig,
-  isEmailEnabled,
-} from './config';
 
 const ORIGINAL_ENV = { ...process.env };
 
 describe('config/loadConfig', () => {
   beforeEach(() => {
+    // Reset modules to clear cached config
     vi.resetModules();
     process.env = { ...ORIGINAL_ENV };
     delete process.env.CONFIG_FILE;
@@ -23,7 +17,9 @@ describe('config/loadConfig', () => {
     vi.restoreAllMocks();
   });
 
-  it('returns defaults when CONFIG_FILE is missing', () => {
+  it('returns defaults when CONFIG_FILE is missing', async () => {
+    // Re-import after resetModules to get fresh module state
+    const { loadConfig, getServerConfig, getDatabaseConfig, isEmailEnabled } = await import('./config');
     const cfg = loadConfig();
     expect(cfg.server.port).toBe(3001);
     expect(getServerConfig().host).toBeDefined();
@@ -31,7 +27,10 @@ describe('config/loadConfig', () => {
     expect(isEmailEnabled()).toBe(false);
   });
 
-  it('disables mailer when enabled but incomplete SMTP config (fake file)', () => {
+  it('disables mailer when enabled but incomplete SMTP config (fake file)', async () => {
+    // Re-import after resetModules to get fresh module state
+    const { loadConfig, getMailerConfig } = await import('./config');
+    
     // FAKE: create a temporary config file content and point CONFIG_FILE to it
     const tmpPath = `${process.cwd()}/tmp-config.yaml`;
     const fakeConfig = {
@@ -50,17 +49,18 @@ describe('config/loadConfig', () => {
     fs.unlinkSync(tmpPath);
   });
 
-  it('throws for invalid config missing required fields', () => {
+  it('throws for invalid config missing required fields', async () => {
+    // Re-import after resetModules to get fresh module state
+    const { loadConfig } = await import('./config');
+    
     const tmpPath = `${process.cwd()}/tmp-invalid-config.yaml`;
     const invalid = { server: { port: 4000 } }; // missing database/security
     fs.writeFileSync(tmpPath, yaml.dump(invalid), 'utf8');
     process.env.CONFIG_FILE = tmpPath;
 
-    // STUB: spy on fs to ensure file exists and reads
-    const existsSpy = vi.spyOn(fs, 'existsSync');
-    existsSpy.mockReturnValue(true);
-
-    expect(() => loadConfig()).toThrowError();
+    // File exists (we just created it), so loadConfig will try to load it
+    // and should throw because required fields are missing
+    expect(() => loadConfig()).toThrowError('Invalid config file');
 
     fs.unlinkSync(tmpPath);
   });
