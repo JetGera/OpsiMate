@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Bell, Database, Layers, LayoutDashboard, Puzzle, Settings } from 'lucide-react';
+import { Bell, Database, Layers, LayoutDashboard, Puzzle, Settings, Zap } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { isAdmin, isEditor } from '../lib/auth';
 import { AppIcon } from './icons/AppIcon';
@@ -41,6 +41,21 @@ export const LeftSidebar = ({ collapsed }: LeftSidebarProps) => {
 				)}
 			>
 				<Button
+					variant={location.pathname === '/alerts' ? 'default' : 'ghost'}
+					className={cn(
+						'gap-3 h-10',
+						collapsed ? 'w-10 justify-center p-0' : 'w-full justify-start px-3',
+						location.pathname === '/alerts' && 'text-primary-foreground'
+					)}
+					asChild
+				>
+					<Link to="/alerts">
+						<Bell className="h-5 w-5 flex-shrink-0" />
+						<span className={cn('font-medium', collapsed && 'sr-only')}>Alerts</span>
+					</Link>
+				</Button>
+
+				<Button
 					variant={location.pathname === '/' ? 'default' : 'ghost'}
 					className={cn(
 						'gap-3 h-10',
@@ -66,25 +81,8 @@ export const LeftSidebar = ({ collapsed }: LeftSidebarProps) => {
 						asChild
 					>
 						<Link to="/providers">
-							<Layers className="h-5 w-5 flex-shrink-0" />
-							<span className={cn('font-medium', collapsed && 'sr-only')}>Add Provider</span>
-						</Link>
-					</Button>
-				)}
-
-				{isEditor() && (
-					<Button
-						variant={location.pathname === '/my-providers' ? 'default' : 'ghost'}
-						className={cn(
-							'gap-3 h-10',
-							collapsed ? 'w-10 justify-center p-0' : 'w-full justify-start px-3',
-							location.pathname === '/my-providers' && 'text-primary-foreground'
-						)}
-						asChild
-					>
-						<Link to="/my-providers">
 							<Database className="h-5 w-5 flex-shrink-0" />
-							<span className={cn('font-medium', collapsed && 'sr-only')}>My Providers</span>
+							<span className={cn('font-medium', collapsed && 'sr-only')}>Providers</span>
 						</Link>
 					</Button>
 				)}
@@ -105,21 +103,22 @@ export const LeftSidebar = ({ collapsed }: LeftSidebarProps) => {
 						</Link>
 					</Button>
 				)}
-
-				<Button
-					variant={location.pathname === '/alerts' ? 'default' : 'ghost'}
-					className={cn(
-						'gap-3 h-10',
-						collapsed ? 'w-10 justify-center p-0' : 'w-full justify-start px-3',
-						location.pathname === '/alerts' && 'text-primary-foreground'
-					)}
-					asChild
-				>
-					<Link to="/alerts">
-						<Bell className="h-5 w-5 flex-shrink-0" />
-						<span className={cn('font-medium', collapsed && 'sr-only')}>Alerts</span>
-					</Link>
-				</Button>
+				{isEditor() && (
+					<Button
+						variant={location.pathname === '/actions' ? 'default' : 'ghost'}
+						className={cn(
+							'gap-3 h-10',
+							collapsed ? 'w-10 justify-center p-0' : 'w-full justify-start px-3',
+							location.pathname === '/actions' && 'text-primary-foreground'
+						)}
+						asChild
+					>
+						<Link to="/actions">
+							<Zap className="h-5 w-5 flex-shrink-0" />
+							<span className={cn('font-medium', collapsed && 'sr-only')}>Actions</span>
+						</Link>
+					</Button>
+				)}
 			</div>
 
 			<div className={cn('p-4 mt-auto flex flex-col gap-3', collapsed && 'items-center')}>

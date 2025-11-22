@@ -37,6 +37,9 @@ import { CustomFieldsController } from './api/v1/custom-fields/controller';
 import { ServicesBL } from './bl/services/services.bl';
 import { PasswordResetsRepository } from './dal/passwordResetsRepository';
 import { MailClient } from './dal/external-client/mail-client';
+import { CustomActionRepository } from './dal/customActionRepository';
+import { CustomActionBL } from './bl/custom-actions/customAction.bl';
+import { CustomActionsController } from './api/v1/custom-actions/controller';
 
 export async function createApp(db: Database.Database, config?: { enableJobs: boolean }): Promise<express.Application> {
 	const app = express();
@@ -69,6 +72,7 @@ export async function createApp(db: Database.Database, config?: { enableJobs: bo
 	const serviceCustomFieldRepo = new ServiceCustomFieldRepository(db);
 	const serviceCustomFieldValueRepo = new ServiceCustomFieldValueRepository(db);
 	const passwordResetsRepo = new PasswordResetsRepository(db);
+	const customActionRepo = new CustomActionRepository(db);
 
 	// Initialize Mail Service
 	const mailClient = new MailClient();
@@ -88,17 +92,19 @@ export async function createApp(db: Database.Database, config?: { enableJobs: bo
 		serviceCustomFieldRepo.initServiceCustomFieldTable(),
 		serviceCustomFieldValueRepo.initServiceCustomFieldValueTable(),
 		passwordResetsRepo.initPasswordResetsTable(),
+		customActionRepo.initCustomActionsTable(),
 	]);
 
 	// BL
 	const auditBL = new AuditBL(auditLogRepo);
 	const providerBL = new ProviderBL(providerRepo, serviceRepo, secretsMetadataRepo, auditBL);
-	const integrationBL = new IntegrationBL(integrationRepo);
 	const alertBL = new AlertBL(alertRepo);
+	const integrationBL = new IntegrationBL(integrationRepo, alertBL);
 	const userBL = new UserBL(userRepo, mailClient, passwordResetsRepo, auditBL);
 	const secretMetadataBL = new SecretsMetadataBL(secretsMetadataRepo, auditBL);
 	const serviceCustomFieldBL = new ServiceCustomFieldBL(serviceCustomFieldRepo, serviceCustomFieldValueRepo);
 	const servicesBL = new ServicesBL(serviceRepo, auditBL);
+	const customActionBL = new CustomActionBL(customActionRepo, providerBL, servicesBL, serviceCustomFieldBL);
 
 	// Controllers
 	const providerController = new ProviderController(providerBL, secretsMetadataRepo);
@@ -118,6 +124,7 @@ export async function createApp(db: Database.Database, config?: { enableJobs: bo
 	const auditController = new AuditController(auditBL);
 	const secretController = new SecretsController(secretMetadataBL);
 	const customFieldsController = new CustomFieldsController(serviceCustomFieldBL);
+	const customActionsController = new CustomActionsController(customActionBL);
 
 	app.use('/', healthRouter);
 	app.use(
@@ -132,13 +139,14 @@ export async function createApp(db: Database.Database, config?: { enableJobs: bo
 			usersController,
 			auditController,
 			secretController,
-			customFieldsController
+			customFieldsController,
+			customActionsController
 		)
 	);
 
 	if (config?.enableJobs) {
 		new RefreshJob(providerBL).startRefreshJob();
-		new PullGrafanaAlertsJob(alertBL, integrationBL, tagRepo).startPullGrafanaAlertsJob();
+		new PullGrafanaAlertsJob(alertBL, integrationBL).startPullGrafanaAlertsJob();
 	}
 
 	return app;
