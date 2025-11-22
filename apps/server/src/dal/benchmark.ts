@@ -22,6 +22,23 @@ async function benchmark() {
 	const providerRepo = new ProviderRepository(db);
 	const tagRepo = new TagRepository(db);
 
+	// Clean up any existing benchmark data
+	console.log('🧹 Cleaning up existing benchmark data...');
+	const existingProvider = db.prepare('SELECT id FROM providers WHERE provider_name = ?').get('Benchmark Provider') as { id: number } | undefined;
+	if (existingProvider) {
+		await providerRepo.deleteProvider(existingProvider.id);
+		console.log('   Deleted existing benchmark provider');
+	}
+
+	// Delete any orphaned benchmark services (services with names like "service-0", "service-1", etc.)
+	db.prepare("DELETE FROM services WHERE service_name LIKE 'service-%'").run();
+	
+	// Delete benchmark tags if they exist
+	for (let i = 0; i < 5; i++) {
+		db.prepare('DELETE FROM tags WHERE name = ?').run(`tag-${i}`);
+	}
+	console.log('   Cleaned up benchmark data\n');
+
 	// Setup test data
 	console.log('📊 Setting up test data...');
 	const provider = await providerRepo.createProvider({
