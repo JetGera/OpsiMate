@@ -70,7 +70,7 @@ async function benchmark() {
 		serviceIds.push(service.lastID);
 
 		// Assign 2-3 tags to each service
-		const numTags = 2 + (i % 2);
+		const numTags = 50;
 		for (let j = 0; j < numTags; j++) {
 			const tagId = tagIds[j % tagIds.length];
 			db.prepare('INSERT OR IGNORE INTO service_tags (service_id, tag_id) VALUES (?, ?)').run(service.lastID, tagId);
